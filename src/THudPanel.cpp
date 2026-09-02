@@ -37,13 +37,26 @@
 #include <QToolTip>
 #include <QVBoxLayout>
 
-// How long a section's data stays believable. These are deliberately different:
-// vitals arrive every prompt, so five seconds of silence already means something is
-// wrong, whereas a room description is expected to sit still for a minute.
-static constexpr int csmVitalsStaleSeconds = 5;
-static constexpr int csmListStaleSeconds = 15;
+// How long a section's data stays believable, which is not the same question for
+// every section.
+//
+// Own afflictions, defences and the room are FACTS pushed over GMCP. The game
+// sends a message when they change, so silence means "still true", not "no longer
+// known" - ageing them into grey would be the panel lying about its own evidence.
+// They carry csmNeverStale and only ever show their age.
+//
+// The target's afflictions and limb counts are INFERENCES from the user's own
+// attacks. Nothing confirms them and nothing retracts them, so they really do decay
+// with time, and saying so is the entire point of the distinction.
+//
+// Vitals sit in between: they arrive with every prompt, so a long silence does mean
+// the game stopped talking - but a character standing still legitimately produces no
+// prompts, so the threshold is generous rather than twitchy.
+static constexpr int csmNeverStale = 0;
+static constexpr int csmVitalsStaleSeconds = 60;
+static constexpr int csmListStaleSeconds = csmNeverStale;
 static constexpr int csmTargetStaleSeconds = 30;
-static constexpr int csmRoomStaleSeconds = 60;
+static constexpr int csmRoomStaleSeconds = csmNeverStale;
 
 // Repaints are capped at this interval; the age labels tick at the slower one.
 static constexpr int csmRefreshMs = 100;
@@ -978,7 +991,10 @@ bool THudPanel::refreshHeading(SectionBox& box, const hud::Section& section, int
     // A section with no timestamp cannot be aged, and inventing one would be worse
     // than admitting that: it reports the age as unknown and is never marked stale.
     const double age = section.updated > 0.0 ? now - section.updated : -1.0;
-    const bool stale = present && age >= static_cast<double>(staleAfterSeconds);
+    // csmNeverStale marks a section whose data does not decay just because nothing
+    // has happened to it. Its age is still shown; it is simply never condemned.
+    const bool ages = staleAfterSeconds > csmNeverStale;
+    const bool stale = present && ages && age >= static_cast<double>(staleAfterSeconds);
 
     QString text;
     if (!present) {
