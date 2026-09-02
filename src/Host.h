@@ -82,6 +82,9 @@ class dlgPackageManager;
 class dlgModuleManager;
 class dlgProfilePreferences;
 class cTelnet;
+#ifdef INCLUDE_ACHAEA_HUD
+class THudPanel;
+#endif
 
 class stopWatch
 {
@@ -605,6 +608,12 @@ public:
 
 
     QPointer<dlgTriggerEditor> mpEditorDialog;
+#ifdef INCLUDE_ACHAEA_HUD
+    // The dock is parented to the main window rather than to this Host, so both
+    // have to be torn down explicitly when the profile closes.
+    QPointer<QDockWidget> mpAchaeaHudDock;
+    QPointer<THudPanel> mpAchaeaHud;
+#endif
     QScopedPointer<TMap> mpMap;
     QScopedPointer<TMedia> mpMedia;
     QScopedPointer<GMCPAuthenticator> mpAuth;
@@ -637,6 +646,17 @@ public:
     // Backward compatibility methods - for existing code that expects boolean behavior
     bool getPrintCommand() const { return mCommandEchoMode != CommandEchoMode::Never; }
     void setPrintCommand(bool print) { mCommandEchoMode = print ? CommandEchoMode::ScriptControl : CommandEchoMode::Never; }
+
+public:
+#ifdef INCLUDE_ACHAEA_HUD
+    // Creates the HUD dock on first use, so a profile that never calls setHudData()
+    // never grows one. Safe to call repeatedly.
+    THudPanel* achaeaHud();
+    THudPanel* achaeaHudIfPresent() const;
+    void setAchaeaHudVisible(const bool visible);
+    bool achaeaHudVisible() const;
+    void destroyAchaeaHud();
+#endif
 
 public:
     void setRemoteEchoingActive(bool active);

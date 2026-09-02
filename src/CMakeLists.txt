@@ -504,6 +504,14 @@ if(USE_MCPSERVER)
   list(APPEND mudlet_HDRS TMCPLuaBridge.h)
 endif(USE_MCPSERVER)
 
+if(USE_ACHAEA_HUD)
+  list(APPEND mudlet_SRCS THudData.cpp)
+  list(APPEND mudlet_SRCS THudPanel.cpp)
+  list(APPEND mudlet_SRCS TLuaInterpreterAchaeaHud.cpp)
+  list(APPEND mudlet_HDRS THudData.h)
+  list(APPEND mudlet_HDRS THudPanel.h)
+endif(USE_ACHAEA_HUD)
+
 if(NOT WIN32)
   include(cmake/EnableSanitizers.cmake)
 else()
@@ -798,6 +806,10 @@ endif()
 
 if(USE_MCPSERVER)
   target_compile_definitions(${LIB_MUDLET_TARGET} PUBLIC INCLUDE_MCPSERVER)
+endif()
+
+if(USE_ACHAEA_HUD)
+  target_compile_definitions(${LIB_MUDLET_TARGET} PUBLIC INCLUDE_ACHAEA_HUD)
 endif()
 
 if(USE_VARIABLE_SPLASH_SCREEN)

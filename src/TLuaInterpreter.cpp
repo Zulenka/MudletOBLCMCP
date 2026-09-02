@@ -5942,6 +5942,11 @@ void TLuaInterpreter::initLuaGlobals()
     lua_register(pGlobalLua, "getProcessMemoryUsage", TLuaInterpreter::getProcessMemoryUsage);
     lua_register(pGlobalLua, "getSubsystemMemoryStats", TLuaInterpreter::getSubsystemMemoryStats);
 #endif
+#ifdef INCLUDE_ACHAEA_HUD
+    lua_register(pGlobalLua, "setHudData", TLuaInterpreter::setHudData);
+    lua_register(pGlobalLua, "clearHudData", TLuaInterpreter::clearHudData);
+    lua_register(pGlobalLua, "hudVisible", TLuaInterpreter::hudVisible);
+#endif
 
     // PLACEMARKER: End of main Lua interpreter functions registration
     // check new functions against https://www.linguistic-antipatterns.com when creating them

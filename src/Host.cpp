@@ -41,6 +41,9 @@
 #include "TConsole.h"
 #include "TDebug.h"
 #include "TDockWidget.h"
+#ifdef INCLUDE_ACHAEA_HUD
+#include "THudPanel.h"
+#endif
 #include "TEvent.h"
 #include "TLabel.h"
 #include "TMainConsole.h"
@@ -481,6 +484,10 @@ Host::~Host()
         mpDlgIRC = nullptr;
         delete pDlgIRC;
     }
+
+#ifdef INCLUDE_ACHAEA_HUD
+    destroyAchaeaHud();
+#endif
 
     for (const auto& pToolBar : mActionUnit.getToolBarList()) {
         delete pToolBar.data();
@@ -4971,6 +4978,95 @@ void Host::createMapper(const bool loadDefaultMap)
     mapOpenEvent.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
     raiseEvent(mapOpenEvent);
 }
+
+#ifdef INCLUDE_ACHAEA_HUD
+THudPanel* Host::achaeaHud()
+{
+    if (mpAchaeaHud) {
+        return mpAchaeaHud.data();
+    }
+    auto* pMainWindow = mudlet::self();
+    if (!pMainWindow) {
+        return nullptr;
+    }
+
+    //: Title of the Achaea combat HUD dock widget, %1 is the profile name
+    auto* pDock = new QDockWidget(tr("HUD - %1").arg(getName()), pMainWindow);
+    pDock->setObjectName(qsl("dockAchaeaHud_%1").arg(getName()));
+    auto* pPanel = new THudPanel(pDock);
+    pPanel->setStyleSheet(mProfileStyleSheet);
+    pDock->setWidget(pPanel);
+
+    // The panel raises this only from a real mouse click. Turning it into a Mudlet
+    // event rather than acting on it here keeps every decision about what to *send*
+    // in Lua, where the user's own click is what started it - the HUD never decides
+    // to act on its own.
+    connect(pPanel, &THudPanel::elementActivated, this, [this](const QString& kind, const QString& id) {
+        TEvent hudEvent{};
+        hudEvent.mArgumentList.append(QLatin1String("hudElementActivated"));
+        hudEvent.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
+        hudEvent.mArgumentList.append(kind);
+        hudEvent.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
+        hudEvent.mArgumentList.append(id);
+        hudEvent.mArgumentTypeList.append(ARGUMENT_TYPE_STRING);
+        raiseEvent(hudEvent);
+    });
+
+    pMainWindow->addDockWidget(Qt::RightDockWidgetArea, pDock);
+    mpAchaeaHudDock = pDock;
+    mpAchaeaHud = pPanel;
+
+    // The dock is created lazily, long after the startup restore has run, so its
+    // saved geometry is only applied if the layout is reloaded now that it exists -
+    // without this the panel ignores wherever it was last dragged, floated or
+    // resized. Same call, for the same reason, as createMapper() and openWindow().
+    mudlet::self()->loadWindowLayout();
+
+    // loadWindowLayout() can restore a previously hidden state; on first creation the
+    // panel should always be visible.
+    pPanel->show();
+    pDock->show();
+    return pPanel;
+}
+
+THudPanel* Host::achaeaHudIfPresent() const
+{
+    return mpAchaeaHud.data();
+}
+
+void Host::setAchaeaHudVisible(const bool visible)
+{
+    if (visible) {
+        if (!achaeaHud()) {
+            return;
+        }
+        mpAchaeaHud->show();
+        mpAchaeaHudDock->setVisible(true);
+        return;
+    }
+    if (mpAchaeaHudDock) {
+        mpAchaeaHudDock->setVisible(false);
+    }
+}
+
+bool Host::achaeaHudVisible() const
+{
+    return mpAchaeaHudDock && mpAchaeaHudDock->isVisible();
+}
+
+void Host::destroyAchaeaHud()
+{
+    // The dock's parent is the main window, so it outlives this Host unless it is
+    // taken down here. Null the QPointers first - a QPointer only clears itself
+    // once ~QObject is reached, so a late lookup would find a half-dead widget.
+    auto* pDock = mpAchaeaHudDock.data();
+    mpAchaeaHudDock = nullptr;
+    mpAchaeaHud = nullptr;
+    if (pDock) {
+        delete pDock;
+    }
+}
+#endif
 
 void Host::setDockLayoutUpdated(const QString& name)
 {

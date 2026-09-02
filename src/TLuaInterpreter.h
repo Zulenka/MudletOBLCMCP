@@ -785,6 +785,11 @@ public:
     static int getProcessMemoryUsage(lua_State*);
     static int getSubsystemMemoryStats(lua_State*);
 #endif
+#ifdef INCLUDE_ACHAEA_HUD
+    static int setHudData(lua_State*);
+    static int clearHudData(lua_State*);
+    static int hudVisible(lua_State*);
+#endif
 
     // PLACEMARKER: End of Lua functions declarations
     // check new functions against https://www.linguistic-antipatterns.com when creating them

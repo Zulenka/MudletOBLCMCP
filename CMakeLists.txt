@@ -189,6 +189,12 @@ include_optional_module(ENVIRONMENT_VARIABLE WITH_MCPSERVER
                         OPTION_VARIABLE USE_MCPSERVER
                         READABLE_NAME "MCP server"
                         DEFAULT OFF)
+# Off by default: it is a game-specific combat overlay for one MUD, so a stock
+# Mudlet has no use for it and should not carry the widget or the Lua API.
+include_optional_module(ENVIRONMENT_VARIABLE WITH_ACHAEA_HUD
+                        OPTION_VARIABLE USE_ACHAEA_HUD
+                        READABLE_NAME "Achaea combat HUD"
+                        DEFAULT OFF)
 include_optional_module(ENVIRONMENT_VARIABLE WITH_SHADER_HOT_RELOAD
                         OPTION_VARIABLE USE_SHADER_HOT_RELOAD
                         READABLE_NAME "shader hot-reloading"
