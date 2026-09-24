@@ -280,6 +280,14 @@ int TLuaInterpreter::setHudData(lua_State* L)
         lua_pop(L, 1);
     }
 
+    update.limbs.state = openSection(L, payload, "limbs");
+    if (update.limbs.state == hud::SectionState::Present) {
+        const int section = lua_gettop(L);
+        readLimbArray(L, section, update.limbs.entries);
+        update.limbs.updated = numberField(L, section, "updated", update.generated);
+        lua_pop(L, 1);
+    }
+
     update.target.state = openSection(L, payload, "target");
     if (update.target.state == hud::SectionState::Present) {
         const int section = lua_gettop(L);

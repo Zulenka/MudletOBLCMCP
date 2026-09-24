@@ -65,6 +65,19 @@ void Snapshot::mergeFrom(const Snapshot& update)
         break;
     }
 
+    switch (update.limbs.state) {
+    case SectionState::Absent:
+        break;
+    case SectionState::Present:
+        limbs = update.limbs;
+        break;
+    case SectionState::Cleared:
+        limbs = LimbList{};
+        limbs.state = SectionState::Cleared;
+        limbs.updated = update.limbs.updated;
+        break;
+    }
+
     switch (update.target.state) {
     case SectionState::Absent:
         break;

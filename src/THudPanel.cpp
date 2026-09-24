@@ -890,6 +890,14 @@ void THudPanel::buildUi()
 
     //: Heading of the HUD section listing the player's own afflictions, which come
     //: from the game and are therefore facts rather than guesses.
+    // Your own limb damage, directly under vitals: it is a fact about you, and it
+    // belongs next to the other facts about you rather than beside the target's.
+    //: Title of the HUD section showing the player's OWN limb damage.
+    mLimbsBox = makeSection(column, tr("Your limbs"));
+    columnLayout->addWidget(mLimbsBox.container);
+    mpOwnBody = new BodyDiagram(this, mLimbsBox.body);
+    mLimbsBox.body->layout()->addWidget(mpOwnBody);
+
     mAfflictionsBox = makeSection(column, tr("Afflictions"));
     columnLayout->addWidget(mAfflictionsBox.container);
     mpOwnAfflictions = new ChipFlow(this, qsl("own-affliction"), mAfflictionsBox.body);
@@ -986,10 +994,23 @@ QString THudPanel::formatAge(double seconds)
     return tr("%1h %2m").arg(whole / 3600).arg((whole % 3600) / 60, 2, 10, QLatin1Char('0'));
 }
 
-void THudPanel::showBody(SectionBox& box, bool haveData)
+void THudPanel::showBody(SectionBox& box, hud::SectionState state)
 {
-    box.body->setVisible(haveData);
-    box.placeholder->setVisible(!haveData);
+    // A section occupies space only while it is Present. The panel is a single
+    // column, so every section that is not carrying data pushes the rest down and
+    // can force the whole HUD to scroll.
+    //
+    // Cleared used to render a "no data" placeholder on the theory that "this is
+    // gone" is a statement worth showing. In practice it is not: an empty but
+    // Present list already says "none" in its own body, which covers the case
+    // that matters, and reserving a heading for a section the adapter has
+    // switched off - or for a target that no longer exists - just costs height.
+    // Absent and Cleared therefore look the same on screen, and the placeholder
+    // is only reachable for a section mid-teardown.
+    const bool present = state == hud::SectionState::Present;
+    box.container->setVisible(present);
+    box.body->setVisible(present);
+    box.placeholder->setVisible(false);
 }
 
 bool THudPanel::refreshHeading(SectionBox& box, const hud::Section& section, int staleAfterSeconds, double now)
@@ -1047,7 +1068,7 @@ void THudPanel::refreshVitals(double now)
     const hud::Vitals& vitals = mSnapshot.vitals;
     refreshHeading(mVitalsBox, vitals, csmVitalsStaleSeconds, now);
     const bool haveData = vitals.state == hud::SectionState::Present;
-    showBody(mVitalsBox, haveData);
+    showBody(mVitalsBox, vitals.state);
     if (!haveData) {
         return;
     }
@@ -1070,18 +1091,28 @@ void THudPanel::refreshVitals(double now)
                     dimmed);
 }
 
+void THudPanel::refreshOwnLimbs(double now)
+{
+    refreshHeading(mLimbsBox, mSnapshot.limbs, csmListStaleSeconds, now);
+    const bool haveData = mSnapshot.limbs.state == hud::SectionState::Present;
+    showBody(mLimbsBox, mSnapshot.limbs.state);
+    if (haveData) {
+        mpOwnBody->setLimbs(mSnapshot.limbs.entries, mLimbsBox.stale);
+    }
+}
+
 void THudPanel::refreshOwnLists(double now)
 {
     refreshHeading(mAfflictionsBox, mSnapshot.afflictions, csmListStaleSeconds, now);
     const bool haveAfflictions = mSnapshot.afflictions.state == hud::SectionState::Present;
-    showBody(mAfflictionsBox, haveAfflictions);
+    showBody(mAfflictionsBox, mSnapshot.afflictions.state);
     if (haveAfflictions) {
         mpOwnAfflictions->setChips(ChipFlow::afflictionChips(mSnapshot.afflictions.entries, QColor(196, 84, 74), now, true), mAfflictionsBox.stale);
     }
 
     refreshHeading(mDefencesBox, mSnapshot.defences, csmListStaleSeconds, now);
     const bool haveDefences = mSnapshot.defences.state == hud::SectionState::Present;
-    showBody(mDefencesBox, haveDefences);
+    showBody(mDefencesBox, mSnapshot.defences.state);
     if (haveDefences) {
         // Defences carry no age: how long a defence has been up says little, whereas
         // how long an affliction has been on you says a great deal.
@@ -1094,7 +1125,7 @@ void THudPanel::refreshTarget(double now)
     const hud::Target& target = mSnapshot.target;
     refreshHeading(mTargetBox, target, csmTargetStaleSeconds, now);
     const bool haveData = target.state == hud::SectionState::Present;
-    showBody(mTargetBox, haveData);
+    showBody(mTargetBox, target.state);
     if (!haveData) {
         return;
     }
@@ -1123,7 +1154,7 @@ void THudPanel::refreshRoom(double now)
     const hud::Room& room = mSnapshot.room;
     refreshHeading(mRoomBox, room, csmRoomStaleSeconds, now);
     const bool haveData = room.state == hud::SectionState::Present;
-    showBody(mRoomBox, haveData);
+    showBody(mRoomBox, room.state);
     if (!haveData) {
         return;
     }
@@ -1177,6 +1208,7 @@ void THudPanel::refresh()
 {
     const double now = epochNow();
     refreshVitals(now);
+    refreshOwnLimbs(now);
     refreshOwnLists(now);
     refreshTarget(now);
     refreshRoom(now);

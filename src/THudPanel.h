@@ -99,6 +99,7 @@ private:
     void tick();
 
     void refreshVitals(double now);
+    void refreshOwnLimbs(double now);
     void refreshOwnLists(double now);
     void refreshTarget(double now);
     void refreshRoom(double now);
@@ -112,7 +113,7 @@ private:
     // Rewrites the age label and returns true when the staleness verdict flipped,
     // which is the only thing the one-second tick can change that needs a repaint.
     bool refreshHeading(SectionBox& box, const hud::Section& section, int staleAfterSeconds, double now);
-    static void showBody(SectionBox& box, bool haveData);
+    static void showBody(SectionBox& box, hud::SectionState state);
 
     hud::Snapshot mSnapshot;
 
@@ -120,6 +121,7 @@ private:
     QTimer* mpTickTimer = nullptr;
 
     SectionBox mVitalsBox;
+    SectionBox mLimbsBox;
     SectionBox mAfflictionsBox;
     SectionBox mDefencesBox;
     SectionBox mTargetBox;
@@ -138,6 +140,9 @@ private:
     BarWidget* mpTargetHealth = nullptr;
     QLabel* mpInferredHeading = nullptr;
     ChipFlow* mpTargetAfflictions = nullptr;
+    // Two figures: mpOwnBody is the player's own damage, mpBodyDiagram the
+    // target's. Same widget class so the two read identically.
+    BodyDiagram* mpOwnBody = nullptr;
     BodyDiagram* mpBodyDiagram = nullptr;
 
     QLabel* mpRoomSummary = nullptr;

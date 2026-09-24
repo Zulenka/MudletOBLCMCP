@@ -118,6 +118,15 @@ struct AfflictionList : Section
     QVector<Affliction> entries;
 };
 
+// The player's OWN limb damage - a fact the client tracks about itself, and a
+// different thing from Target::limbs, which is what our attacks have done to
+// someone else. Broken legs put you prone and broken arms stop you wielding, so
+// this is decision-relevant in its own right.
+struct LimbList : Section
+{
+    QVector<Limb> entries;
+};
+
 struct Target : Section
 {
     QString name;
@@ -147,6 +156,8 @@ struct Snapshot
     AfflictionList afflictions;
     // Own defences - facts.
     AfflictionList defences;
+    // Own limb damage - facts.
+    LimbList limbs;
     Target target;
     Room room;
 
