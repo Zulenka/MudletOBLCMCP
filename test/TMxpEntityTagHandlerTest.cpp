@@ -17,187 +17,240 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include <QTest>
-#include "QtTest/qtestcase.h"
 #include "TMxpEntityTagHandler.h"
 #include "TMxpStubClient.h"
+#include <QTest>
+#include <TMxpProcessor.h>
 #include <TMxpTagParser.h>
 #include <TMxpTagProcessor.h>
-#include <TMxpProcessor.h>
 
 class TMxpEntityTagHandlerTest : public QObject {
-Q_OBJECT
+  Q_OBJECT
 
 private:
+  static QSharedPointer<MxpNode> parseNode(const QString &tagText) {
+    auto nodes = TMxpTagParser::parseToMxpNodeList(tagText);
+    return !nodes.empty() ? nodes.first() : nullptr;
+  }
+
+  void processInput(TMxpProcessor &processor, const std::string& input) {
+    for (char ch : input) {
+      processor.processMxpInput(ch, true);
+    }
+  }
 
 private slots:
-    static QSharedPointer<MxpNode> parseNode(const QString& tagText)
-    {
-        auto nodes = TMxpTagParser::parseToMxpNodeList(tagText);
-        return !nodes.empty() ? nodes.first() : nullptr;
-    }
+  void testPublish() {
+    TMxpStubClient stub;
+    TMxpTagProcessor processor;
 
-    void processInput(TMxpProcessor &processor, std::string &input) {
-        for (char &ch : input) {
-            processor.processMxpInput(ch, true);
-        }
-    }
+    auto tag = parseNode("<!EN ob \"street lamp\" publish>");
+    processor.handleNode(processor, stub, tag.get());
 
-    void testPublish()
-    {
-        TMxpStubClient stub;
-        TMxpTagProcessor processor;
+    QCOMPARE(processor.getEntityResolver().getResolution("&ob;"),
+             "street lamp");
 
-        auto tag = parseNode("<!EN ob \"street lamp\" publish>");
-        processor.handleNode(processor, stub, tag.get());
+    QCOMPARE(stub.mPublishedEntityName, "&ob;");
+    QCOMPARE(stub.mPublishedEntityValue, "street lamp");
+  }
 
-        QCOMPARE(processor.getEntityResolver().getResolution("&ob;"), "street lamp");
+  void testPrivate() {
+    TMxpStubClient stub;
+    TMxpTagProcessor processor;
 
-        QCOMPARE(stub.mPublishedEntityName, "&ob;");
-        QCOMPARE(stub.mPublishedEntityValue, "street lamp");
-    }
+    auto tag = parseNode("<!EN ob \"street lamp\" private>");
+    processor.handleNode(processor, stub, tag.get());
 
-    void testPrivate()
-    {
-        TMxpStubClient stub;
-        TMxpTagProcessor processor;
+    QCOMPARE(processor.getEntityResolver().getResolution("&ob;"),
+             "street lamp");
 
-        auto tag = parseNode("<!EN ob \"street lamp\" private>");
-        processor.handleNode(processor, stub, tag.get());
+    QCOMPARE(stub.mPublishedEntityName, "");
+    QCOMPARE(stub.mPublishedEntityValue, "");
+  }
 
-        QCOMPARE(processor.getEntityResolver().getResolution("&ob;"), "street lamp");
+  void testAddRemoveStart() {
+    TMxpStubClient stub;
+    TMxpTagProcessor processor;
 
-        QCOMPARE(stub.mPublishedEntityName, "");
-        QCOMPARE(stub.mPublishedEntityValue, "");
-    }
+    processor.getEntityResolver().registerEntity("&entity;", "v1");
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
 
-    void testAddRemoveStart()
-    {
-        TMxpStubClient stub;
-        TMxpTagProcessor processor;
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"v2\" add>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1|v2");
 
-        processor.getEntityResolver().registerEntity("&entity;", "v1");
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"v1\" remove>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v2");
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"v2\" add>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1|v2");
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"v2\" remove>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "");
+  }
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"v1\" remove>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v2");
+  void testAddRemoveEnd() {
+    TMxpStubClient stub;
+    TMxpTagProcessor processor;
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"v2\" remove>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "");
-    }
+    processor.getEntityResolver().registerEntity("&entity;", "v1");
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
 
-    void testAddRemoveEnd()
-    {
-        TMxpStubClient stub;
-        TMxpTagProcessor processor;
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"v2\" add>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1|v2");
 
-        processor.getEntityResolver().registerEntity("&entity;", "v1");
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"v2\" remove>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
+  }
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"v2\" add>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1|v2");
+  void testAddRemovePartOfItemValue() {
+    TMxpStubClient stub;
+    TMxpTagProcessor processor;
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"v2\" remove>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
-    }
+    processor.getEntityResolver().registerEntity("&entity;", "my text example");
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"),
+             "my text example");
 
-    void testAddRemovePartOfItemValue()
-    {
-        TMxpStubClient stub;
-        TMxpTagProcessor processor;
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"my value\" add>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"),
+             "my text example|my value");
 
-        processor.getEntityResolver().registerEntity("&entity;", "my text example");
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "my text example");
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"my text\" remove>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"),
+             "my text example|my value");
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"my value\" add>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "my text example|my value");
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"example\" remove>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"),
+             "my text example|my value");
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"my text\" remove>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "my text example|my value");
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"value\" remove>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"),
+             "my text example|my value");
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"example\" remove>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "my text example|my value");
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"my\" remove>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"),
+             "my text example|my value");
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"value\" remove>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "my text example|my value");
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity \"my v\" remove>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"),
+             "my text example|my value");
+  }
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"my\" remove>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "my text example|my value");
+  void testInterpolation() {
+    TMxpStubClient stub;
+    TMxpProcessor processor(&stub);
+    processor.setMode(6); // !EN and SEND are SECURE tags
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"my v\" remove>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "my text example|my value");
-    }
+    std::string input =
+        "<!EN ob \"street lamp\" private><send href=\"kill &ob;\">kill</send>";
+    processInput(processor, input);
 
-    void testInterpolation()
-    {
-        TMxpStubClient stub;
-        TMxpProcessor processor(&stub);
+    QCOMPARE(stub.mHrefs.size(), 1);
+    QCOMPARE(stub.mHrefs[0], "send([[kill street lamp]])");
 
-        std::string input = "<!EN ob \"street lamp\" private><send href=\"kill &ob;\">kill</send>";
-        processInput(processor, input);
+    QCOMPARE(stub.mHints.size(), 1);
+    QCOMPARE(stub.mHints[0], "kill street lamp");
+  }
 
-        QCOMPARE(stub.mHrefs.size(), 1);
-        QCOMPARE(stub.mHrefs[0], "send([[kill street lamp]])");
+  void testDelete() {
+    TMxpStubClient stub;
+    TMxpTagProcessor processor;
 
-        QCOMPARE(stub.mHints.size(), 1);
-        QCOMPARE(stub.mHints[0], "kill street lamp");
-    }
+    processor.getEntityResolver().registerEntity("&entity;", "v1");
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
 
-    void testDelete() {
-        TMxpStubClient stub;
-        TMxpTagProcessor processor;
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN entity delete>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"),
+             "&entity;");
 
-        processor.getEntityResolver().registerEntity("&entity;", "v1");
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
+    processor.getEntityResolver().registerEntity("&myEntity;", "v2");
+    QCOMPARE(processor.getEntityResolver().getResolution("&myEntity;"), "v2");
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity delete>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "&entity;");
+    processor.handleNode(processor, stub,
+                         parseNode("<!EN myEntity delete>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&myEntity;"),
+             "&myEntity;");
+  }
 
-        processor.getEntityResolver().registerEntity("&myEntity;", "v2");
-        QCOMPARE(processor.getEntityResolver().getResolution("&myEntity;"), "v2");
+  void testEntityModification() {
+    TMxpStubClient stub;
+    TMxpTagProcessor processor;
 
-        processor.handleNode(processor, stub, parseNode("<!EN myEntity delete>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&myEntity;"), "&myEntity;");
-    }
+    processor.getEntityResolver().registerEntity("&entity;", "v1");
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
 
-    void testEmpty() {
-        TMxpStubClient stub;
-        TMxpProcessor mxpProcessor(&stub);
-        TMxpTagProcessor processor;
+    processor.handleNode(processor, stub, parseNode("<!EN entity ''>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "");
 
-        processor.getEntityResolver().registerEntity("&entity;", "v1");
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "v1");
+    processor.handleNode(processor, stub, parseNode("<!EN entity V2>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "V2");
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity ''>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "");
+    processor.handleNode(processor, stub, parseNode("<!EN entity>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "");
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity V2>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "V2");
+    processor.handleNode(processor, stub, parseNode("<!EN entity V3>").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "V3");
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "");
+    processor.handleNode(processor, stub, parseNode("<!EN entity \"\">").get());
+    QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "");
+  }
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity V3>").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "V3");
+  // <!ENTITY> values must be decoded with the session encoding rather than
+  // hardcoded UTF-8 - covers quoted and unquoted values in a WINDOWS-1251
+  // session ("Гроза" = bytes C3 F0 EE E7 E0)
+  void testNonUtf8SessionEntityValue() {
+    TMxpStubClient stub;
+    stub.mEncoding = QByteArrayLiteral("WINDOWS-1251");
+    TMxpProcessor processor(&stub);
+    processor.setMode(6);
 
-        processor.handleNode(processor, stub, parseNode("<!EN entity \"\">").get());
-        QCOMPARE(processor.getEntityResolver().getResolution("&entity;"), "");
+    processInput(processor, "<!ENTITY storm \"\xC3\xF0\xEE\xE7\xE0\">");
+    processInput(processor, "<!ENTITY storm2 \xC3\xF0\xEE\xE7\xE0>");
 
-        // check if entity is really removed without trace in interpolation:
-        std::string input = "<!en entity ''><send href=\"examine ob&entity;\" hint=\"examine&entity;\">examine</send>";
-        processInput(mxpProcessor, input);
+    TEntityResolver &resolver =
+        processor.getMxpTagProcessor().getEntityResolver();
+    QCOMPARE(resolver.getResolution("&storm;"), QString("Гроза"));
+    QCOMPARE(resolver.getResolution("&storm2;"), QString("Гроза"));
+  }
 
-        QCOMPARE(stub.mHrefs.size(), 1);
-        QCOMPARE(stub.mHrefs[0], "send([[examine ob]])");
+  // UTF-8 sessions must keep resolving non-Latin1 entity values unchanged
+  void testUtf8SessionEntityValue() {
+    TMxpStubClient stub;
+    TMxpProcessor processor(&stub);
+    processor.setMode(6);
 
-        QCOMPARE(stub.mHints.size(), 1);
-        QCOMPARE(stub.mHints[0], "examine");
-    }
+    processInput(processor, "<!ENTITY storm \"Гроза\">");
+
+    QCOMPARE(
+        processor.getMxpTagProcessor().getEntityResolver().getResolution(
+            "&storm;"),
+        QString("Гроза"));
+  }
+
+  void testEmptyEntityInterpolation() {
+    TMxpStubClient stub;
+    TMxpProcessor mxpProcessor(&stub);
+    mxpProcessor.setMode(6);
+
+    std::string input = "<!en entity ''><send href=\"examine ob&entity;\" "
+                        "hint=\"examine&entity;\">examine</send>";
+    processInput(mxpProcessor, input);
+
+    QCOMPARE(stub.mHrefs.size(), 1);
+    QCOMPARE(stub.mHrefs[0], "send([[examine ob]])");
+
+    QCOMPARE(stub.mHints.size(), 1);
+    QCOMPARE(stub.mHints[0], "examine");
+  }
 };
 
 #include "TMxpEntityTagHandlerTest.moc"
 QTEST_MAIN(TMxpEntityTagHandlerTest)
-

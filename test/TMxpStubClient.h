@@ -66,6 +66,9 @@ public:
     QString version = "Stub-1.0";
     bool linkMode;
 
+    QByteArray mEncoding = QByteArrayLiteral("UTF-8");
+    QByteArray getEncoding() const override { return mEncoding; }
+
     QString sentToServer;
 
     QString fgColor, bgColor;
@@ -188,7 +191,6 @@ public:
 
     int setLink(const QStringList& hrefs, const QStringList& hints) override
     {
-        qDebug().noquote() << qsl("setLink([%1], [%2])").arg(hrefs.join(", "), hints.join(", "));
         mHrefs = hrefs;
         mHints = hints;
 
@@ -197,7 +199,6 @@ public:
 
     int setLink(const QStringList& hrefs, const QStringList& hints, const QString& expireName) override
     {
-        qDebug().noquote() << qsl("setLink([%1], [%2], [%3])").arg(hrefs.join(", "), hints.join(", "), expireName);
         mHrefs = hrefs;
         mHints = hints;
         mExpireName = expireName;

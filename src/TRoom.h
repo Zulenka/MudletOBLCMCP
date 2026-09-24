@@ -69,7 +69,7 @@ public:
     bool hasExitStub(int direction);
     void setExitStub(int direction, bool status);
     void calcRoomDimensions();
-    bool setArea(int, bool deferAreaRecalculations = false);
+    bool setArea(int);
     int getExitWeight(const QString& cmd);
 
     inline int x() const { return mX; }
@@ -87,7 +87,7 @@ public:
     }
     int getWeight() const { return weight; }
     bool isHidden() const { return hidden; }
-    void setHidden(bool isHidden);
+    void setHidden(const bool);
     int getNorth() const { return north; }
     void setNorth(int id) { north = id; }
     int getNorthwest() const { return northwest; }

@@ -6,14 +6,14 @@ Have Mudlet and [Busted](https://lunarmodules.github.io/busted/) installed:
 
 ```sh
   sudo apt-get install luarocks
-  sudo luarocks install busted
+  sudo luarocks --lua-version 5.1 install busted
 ```
 
 ## macOS
 
 ```sh
   brew install luarocks
-  luarocks install busted
+  luarocks --lua-version 5.1 install busted
 ```
 
 ## Windows
@@ -32,7 +32,7 @@ Have Mudlet and [Busted](https://lunarmodules.github.io/busted/) installed:
 
 ### Install Busted
 
-- Open a command prompt and enter `luarocks install busted`
+- Open a command prompt and enter `luarocks --lua-version 5.1 install busted`
 - If you get a `'luarocks' is not recognized...` message:
   - You may need to add the LuaRocks directory to your `Path` system environment variable and restart
   - Alternatively, navigate the command prompt to the LuaRocks directory to run LuaRocks commands
@@ -52,6 +52,48 @@ runTests <full path>/src/mudlet-lua/tests
 
 -- run a specific test
 runTests <full path>/src/mudlet-lua/tests/StringUtils_spec.lua
+```
+
+## Running tests headlessly (and in parallel)
+
+The suite can also be run without touching the GUI, which is how CI runs it:
+
+```sh
+AUTORUN_BUSTED_TESTS=true \
+MUDLET_TEST_MODE=1 \
+QUIT_MUDLET_AFTER_TESTS=true \
+TESTS_DIRECTORY=<full path>/src/mudlet-lua/tests \
+xvfb-run -a ./build/src/mudlet --profile "Mudlet self-test" --mirror
+```
+
+A failure writes a marker file (`/tmp/busted-tests-failed` on Linux/macOS) so the
+caller can detect it.
+
+By default Mudlet reads and writes `~/.config/mudlet`, so two runs started at the
+same time (for example from different checkouts) share one `Mudlet self-test`
+profile and collide on its sqlite databases, and leftover state from a previous
+run is not cleaned up. To give a run its own pristine, isolated config root:
+
+- `XDG_CONFIG_HOME` - Mudlet uses `$XDG_CONFIG_HOME/mudlet` as its config root
+  (profiles, sqlite databases, settings, and password storage). Because an
+  existing `~/.config/mudlet` holding profiles otherwise wins (so a system-wide
+  `XDG_CONFIG_HOME` export never strands real profiles), a test harness must
+  **pre-create** `$XDG_CONFIG_HOME/mudlet/profiles` to opt in. The `mudlet`
+  directory on its own is not enough - other tooling creates that by accident,
+  and treating it as an opt-in would hide the user's real profiles.
+- `MUDLET_TEST_FAILURE_MARKER` - absolute path for the failure marker, so it is
+  not shared either.
+
+```sh
+CONFIG_DIR=$(mktemp -d)
+mkdir -p "$CONFIG_DIR/mudlet/profiles"   # pre-create to opt into the isolated config root
+AUTORUN_BUSTED_TESTS=true \
+MUDLET_TEST_MODE=1 \
+QUIT_MUDLET_AFTER_TESTS=true \
+TESTS_DIRECTORY=<full path>/src/mudlet-lua/tests \
+XDG_CONFIG_HOME="$CONFIG_DIR" \
+MUDLET_TEST_FAILURE_MARKER="$CONFIG_DIR/busted-tests-failed" \
+xvfb-run -a ./build/src/mudlet --profile "Mudlet self-test" --mirror
 ```
 
 ## Creating tests

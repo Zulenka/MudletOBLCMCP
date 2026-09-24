@@ -35,7 +35,9 @@
 #include <QDebug>
 #include <QPainter>
 #include <QKeyEvent>
+#include <chrono>
 
+using namespace std::chrono_literals;
 
 ModernGLWidget::ModernGLWidget(TMap* pMap, Host* pHost, QWidget* parent)
 : QOpenGLWidget(parent)
@@ -57,7 +59,7 @@ ModernGLWidget::ModernGLWidget(TMap* pMap, Host* pHost, QWidget* parent)
 
     // Initialize smooth camera animation
     mCameraAnimationTimer = new QTimer(this);
-    mCameraAnimationTimer->setInterval(17); // ~60fps updates for smoother animation
+    mCameraAnimationTimer->setInterval(17ms); // ~60fps updates for smoother animation
     connect(mCameraAnimationTimer, &QTimer::timeout, this, &ModernGLWidget::onCameraAnimationTick);
     mEasingCurve.setType(QEasingCurve::OutQuart); // Natural deceleration
 }
@@ -80,6 +82,7 @@ void ModernGLWidget::cleanup()
     mNormalBuffer.destroy();
     mIndexBuffer.destroy();
     mInstanceBuffer.destroy();
+    mTexCoordBuffer.destroy();
     mVAO.destroy();
     doneCurrent();
 }
@@ -252,7 +255,7 @@ void ModernGLWidget::paintGL()
                 if (mpMap->mpRoomDB->isEmpty()) {
                     message = tr("No rooms in the map - load another one, or start mapping from scratch to begin.");
                 } else {
-                    message = tr("You have a map loaded (%n room(s)), but Mudlet does not know where you are at the moment.", "", mpMap->mpRoomDB->size());
+                    message = tr("You have a map loaded (%n room(s)), but Mudlet does not know where you are at the moment.", nullptr, mpMap->mpRoomDB->size());
                 }
             } else {
                 message = tr("You do not have a map yet - load one, or start mapping from scratch to begin.");
@@ -1604,16 +1607,18 @@ void ModernGLWidget::renderBackgroundLabels()
         float centerZ = label.pos.z();
 
         // Create render command for this label
-        auto command = std::make_unique<RenderLabelCommand>(
-            centerX, centerY, centerZ,
-            labelWidth, labelHeight,
-            textureId,
-            mCameraController.getRightVector(),
-            mCameraController.getUpVector(),
-            label.highlight,
-            mCameraController.getProjectionMatrix(),
-            mCameraController.getViewMatrix(),
-            mCameraController.getModelMatrix());
+        auto command = std::make_unique<RenderLabelCommand>(centerX,
+                                                            centerY,
+                                                            centerZ,
+                                                            labelWidth,
+                                                            labelHeight,
+                                                            textureId,
+                                                            mCameraController.getRightVector(),
+                                                            mCameraController.getUpVector(),
+                                                            label.highlight,
+                                                            mCameraController.getProjectionMatrix(),
+                                                            mCameraController.getViewMatrix(),
+                                                            mCameraController.getModelMatrix());
 
         mRenderCommandQueue.addCommand(std::move(command));
     }
@@ -1682,16 +1687,18 @@ void ModernGLWidget::renderForegroundLabels()
         float centerZ = label.pos.z();
 
         // Create render command for this label
-        auto command = std::make_unique<RenderLabelCommand>(
-            centerX, centerY, centerZ,
-            labelWidth, labelHeight,
-            textureId,
-            mCameraController.getRightVector(),
-            mCameraController.getUpVector(),
-            label.highlight,
-            mCameraController.getProjectionMatrix(),
-            mCameraController.getViewMatrix(),
-            mCameraController.getModelMatrix());
+        auto command = std::make_unique<RenderLabelCommand>(centerX,
+                                                            centerY,
+                                                            centerZ,
+                                                            labelWidth,
+                                                            labelHeight,
+                                                            textureId,
+                                                            mCameraController.getRightVector(),
+                                                            mCameraController.getUpVector(),
+                                                            label.highlight,
+                                                            mCameraController.getProjectionMatrix(),
+                                                            mCameraController.getViewMatrix(),
+                                                            mCameraController.getModelMatrix());
 
         mRenderCommandQueue.addCommand(std::move(command));
     }

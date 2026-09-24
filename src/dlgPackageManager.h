@@ -26,14 +26,17 @@
 #include "PackageItemDelegate.h"
 
 #include "ui_package_manager.h"
+#include <QButtonGroup>
 #include <QDialog>
 #include <QJsonArray>
+#include <QJsonObject>
 #include <QListWidget>
 #include <QTextBrowser>
 
 class Host;
 class QNetworkReply;
 
+enum class NavigationView { Explore, Installed, Updates };
 
 class dlgPackageManager : public QDialog, public Ui::package_manager
 {
@@ -52,29 +55,37 @@ private slots:
     void slot_installPackageFromFile();
     void slot_installPackageFromRepository();
     void slot_itemChanged(QListWidgetItem*);
+    void slot_navigationButtonClicked(int buttonId);
     void slot_openBugWebsite();
     void slot_openPackageWebsite();
-    void slot_onIconDownloaded(QNetworkReply *reply);
+    void slot_onIconDownloaded(QNetworkReply* reply);
     void slot_removePackages();
-    void slot_searchTextChanged(const QString &searchText);
+    void slot_searchTextChanged(const QString& searchText);
     void slot_setPackageList();
     void slot_toggleInstallRepoButton();
     void slot_toggleRemoveButton();
 
 private:
+    void applyNavigationStyles();
     void clearPackageDetails();
     void closeEvent(QCloseEvent* event) override;
-    void downloadIcon(const QString &packageName);
+    void downloadIcon(const QString& packageName);
     void downloadRepositoryIndex();
-    void fillPackageDetails(const QString &name, const QString &title, const QString &author, const QString &version);
+    void fillPackageDetails(const QString& name, const QString& title, const QString& author, const QString& version);
+    bool hasNewerVersion(const QString& installed, const QString& repo) const;
+    QString packageHelpUrl(const QString& packageName) const;
+    void populatePackagesWithUpdates();
+    void setupNavigationButtons();
     void showImportStatus(const QString& message);
+    void updateUpdatesBadge();
 
     Host* mpHost = nullptr;
+    QButtonGroup* mpNavigationGroup = nullptr;
+    NavigationView mCurrentView = NavigationView::Installed;
+    QList<QString> mPackagesWithUpdates;
     PackageItemDelegate* mpPackageItemDelegate = nullptr;
     QHash<QString, QJsonObject> packageLookup;
     QJsonArray repositoryPackages;
-    QListWidgetItem* statusAvailable;
-    QListWidgetItem* statusInstalled;
 };
 
 #endif

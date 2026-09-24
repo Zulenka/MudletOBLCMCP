@@ -33,6 +33,7 @@
 #include <QElapsedTimer>
 #include <QFont>
 #include <QIcon>
+#include <QPixmap>
 #include <QPointer>
 #include <QSaveFile>
 #include <QWidget>
@@ -49,12 +50,12 @@
 struct TFontAttributes
 {
     explicit TFontAttributes(const bool isAntiAliased = false)
-    : mStyleStrategy(isAntiAliased
-                             ? static_cast<QFont::StyleStrategy>(QFont::PreferAntialias | QFont::PreferQuality)
-                             : static_cast<QFont::StyleStrategy>(QFont::NoAntialias | QFont::PreferQuality))
-    {}
+    : mStyleStrategy(isAntiAliased ? static_cast<QFont::StyleStrategy>(QFont::PreferAntialias | QFont::PreferQuality) : static_cast<QFont::StyleStrategy>(QFont::NoAntialias | QFont::PreferQuality))
+    {
+    }
 
-    explicit TFontAttributes(const QFont& font) {
+    explicit TFontAttributes(const QFont& font)
+    {
         mName = font.family();
         mPointSize = font.pointSize();
         mStyleHint = font.styleHint();
@@ -76,9 +77,11 @@ struct TFontAttributes
     bool operator==(const TFontAttributes& other) const = default;
     bool operator!=(const TFontAttributes& other) const = default;
 
+    TFontAttributes(const TFontAttributes& other) = default;
     TFontAttributes& operator=(const TFontAttributes& other) = default;
 
-    QFont makeFont() const {
+    QFont makeFont() const
+    {
         QFont font = QFont(mName, mPointSize, mWeight, mItalic);
         font.setFixedPitch(mFixedPitch);
         font.setStyleHint(mStyleHint, mStyleStrategy);
@@ -90,10 +93,10 @@ struct TFontAttributes
         return font;
     }
 
-    void setAntiAliasOption(const bool isAntiAliased) {
-        mStyleStrategy = isAntiAliased
-                                 ? static_cast<QFont::StyleStrategy>(QFont::PreferAntialias | QFont::PreferQuality)
-                                 : static_cast<QFont::StyleStrategy>(QFont::NoAntialias | QFont::PreferQuality);
+    void setAntiAliasOption(const bool isAntiAliased)
+    {
+        mStyleStrategy =
+                isAntiAliased ? static_cast<QFont::StyleStrategy>(QFont::PreferAntialias | QFont::PreferQuality) : static_cast<QFont::StyleStrategy>(QFont::NoAntialias | QFont::PreferQuality);
     }
 
     // enums to consider:
@@ -114,14 +117,14 @@ struct TFontAttributes
     QFont::StyleHint mStyleHint = QFont::AnyStyle;
     // We use either: (QFont::NoAntialias | QFont::PreferQuality) for all
     // TConsoles but the main one can be set to (QFont::PreferAntialias |
-    // QFont::PreferQuality) instead - see constuctor:
-    QFont::StyleStrategy mStyleStrategy;
+    // QFont::PreferQuality) instead - see constructor:
+    QFont::StyleStrategy mStyleStrategy = static_cast<QFont::StyleStrategy>(QFont::NoAntialias | QFont::PreferQuality);
     // qreal mLetterSpacing = 0.0;
     // QFont::SpacingType mSpacingType = QFont::AbsoluteSpacing;
     // We use but don't set "Line Spacing" - so don't worry about it.
     QFont::Weight mWeight = QFont::Normal;
     bool mFixedPitch = true; // We always set this
-    bool mKerning = false; // We haven't been resetting this but we ought to
+    bool mKerning = false;   // We haven't been resetting this but we ought to
     // we don't set these on "base" fonts for TConsole's but we can set them for
     // bits of text:
     bool mUnderline = false;
@@ -130,11 +133,7 @@ struct TFontAttributes
     bool mItalic = false;
 };
 
-enum class ControlCharacterMode {
-    AsIs = 0x0,
-    Picture = 0x1,
-    OEM = 0x2
-};
+enum class ControlCharacterMode { AsIs = 0x0, Picture = 0x1, OEM = 0x2 };
 
 // Needed so it can be handled as a QVariant
 Q_DECLARE_METATYPE(ControlCharacterMode)
@@ -168,13 +167,13 @@ class TConsole : public QWidget
 
 public:
     enum ConsoleTypeFlag {
-        UnknownType = 0x0, // Should not be encountered but left as a trap value
+        UnknownType = 0x0,         // Should not be encountered but left as a trap value
         CentralDebugConsole = 0x1, // One of these for whole application
-        ErrorConsole = 0x2, // The bottom right corner of the Editor, one per profile
-        MainConsole = 0x4, // One per profile
-        SubConsole = 0x8, // Overlaid on top of MainConsole instance, should be uniquely named in pool of SubConsole/UserWindow/Buffers AND Labels
-        UserWindow = 0x10, // Floatable/Dockable console, should be uniquely named in pool of SubConsole/UserWindow/Buffers AND Labels
-        Buffer = 0x20 // Non-visible store for data that can be copied to/from other per profile TConsoles, should be uniquely named in pool of SubConsole/UserWindow/Buffers AND Labels
+        ErrorConsole = 0x2,        // The bottom right corner of the Editor, one per profile
+        MainConsole = 0x4,         // One per profile
+        SubConsole = 0x8,          // Overlaid on top of MainConsole instance, should be uniquely named in pool of SubConsole/UserWindow/Buffers AND Labels
+        UserWindow = 0x10,         // Floatable/Dockable console, should be uniquely named in pool of SubConsole/UserWindow/Buffers AND Labels
+        Buffer = 0x20              // Non-visible store for data that can be copied to/from other per profile TConsoles, should be uniquely named in pool of SubConsole/UserWindow/Buffers AND Labels
     };
     Q_DECLARE_FLAGS(ConsoleType, ConsoleTypeFlag)
 
@@ -208,7 +207,7 @@ public:
     int getButtonState();
     void closeEvent(QCloseEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
-    void pasteWindow(TBuffer);
+    void pasteWindow(const TBuffer&);
     QStringList getLines(int from, int to);
     int getLineNumber();
     int getLineCount();
@@ -236,7 +235,7 @@ public:
         buffer.setWrapHangingIndent(count);
     }
 
-    TLinkStore &getLinkStore() { return buffer.mLinkStore; }
+    TLinkStore& getLinkStore() { return buffer.mLinkStore; }
     void echo(const QString&);
     bool moveCursor(int x, int y);
     int select(const QString&, int numOfMatch = 1);
@@ -253,14 +252,27 @@ public:
     void setCommandFgColor(const QColor&);
     void setCommandFgColor(int, int, int, int);
     void setScrollBarVisible(bool);
+    bool getScrollBarVisible() const;
     void setHorizontalScrollBar(bool);
     void setScrolling(const bool state);
     bool getScrolling() const { return mScrollingEnabled; }
-    
-    THyperlinkCompactManager& getHyperlinkCompactManager() { Q_ASSERT(mpHyperlinkCompactManager); return *mpHyperlinkCompactManager; }
-    THyperlinkSelectionManager& getHyperlinkSelectionManager() { Q_ASSERT(mpHyperlinkSelectionManager); return *mpHyperlinkSelectionManager; }
-    THyperlinkVisibilityManager& getHyperlinkVisibilityManager() { Q_ASSERT(mpHyperlinkVisibilityManager); return *mpHyperlinkVisibilityManager; }
-    
+
+    THyperlinkCompactManager& getHyperlinkCompactManager()
+    {
+        Q_ASSERT(mpHyperlinkCompactManager);
+        return *mpHyperlinkCompactManager;
+    }
+    THyperlinkSelectionManager& getHyperlinkSelectionManager()
+    {
+        Q_ASSERT(mpHyperlinkSelectionManager);
+        return *mpHyperlinkSelectionManager;
+    }
+    THyperlinkVisibilityManager& getHyperlinkVisibilityManager()
+    {
+        Q_ASSERT(mpHyperlinkVisibilityManager);
+        return *mpHyperlinkVisibilityManager;
+    }
+
     void setCmdVisible(bool);
     void changeColors();
     void scrollDown(int lines);
@@ -281,6 +293,15 @@ public:
     void setFontName(const QString& fontName);
     bool setConsoleBackgroundImage(const QString&, int);
     bool resetConsoleBackgroundImage();
+    bool setWindowBackgroundImage(const QString&, int);
+    bool resetWindowBackgroundImage();
+    void updateMainFrameTransparency();
+    // False only when a scale failed; no source or an unsized widget defers to the next resize
+    bool updateWindowBackgroundCoverPixmap();
+    static QRect coverSourceRect(const QSize& sourceSize, const QSize& targetSize);
+    void setBorderColor(const QColor&);
+    QColor borderColor() const { return mBorderColor; }
+    void lowerMainDisplay();
     void setLink(const QStringList& linkFunction, const QStringList& linkHint, const QVector<int> linkReference = QVector<int>());
     // Cannot be called setAttributes as that would mask an inherited method
     void setDisplayAttributes(const TChar::AttributeFlags, const bool);
@@ -288,7 +309,7 @@ public:
     void hideEvent(QHideEvent* event) override;
     void setConsoleBgColor(int, int, int, int);
     QColor getConsoleBgColor() const { return mBgColor; }
-// Not used:    void setConsoleFgColor(int, int, int);
+    // Not used:    void setConsoleFgColor(int, int, int);
     std::list<int> getFgColor();
     std::list<int> getBgColor();
     void luaWrapLine(int line);
@@ -316,12 +337,11 @@ public:
     void clearSplit();
     bool showTimeStamps() const { return mShowTimeStamps; }
     void raiseMudletResizeEvent();
-    // This *should* be overridding the (void) QWidget::setFont(const QFont&)
-    // method but doesn't seem to be...!
-    // The forceChange option is required when using this method within
-    // setFontName(...) or setFontSize(...) so that the changes made
-    // on the TFontDetails class are forced into play, as otherwise
-    // it looks that they haven't inside this method:
+    // This hides QWidget::setFont(const QFont&) rather than overriding it
+    // (QWidget::setFont is non-virtual). The forceChange parameter is needed
+    // when calling from setFontName(...) or setFontSize(...) because those
+    // modify mDisplayFontDetails before calling this, and the TFontAttributes
+    // comparison would otherwise see no change:
     void setFont(const QFont&, const bool forceChange = false);
 
 
@@ -374,6 +394,7 @@ public:
     QWidget* mpMainFrame = nullptr;
     QWidget* mpRightToolBar = nullptr;
     QWidget* mpMainDisplay = nullptr;
+    QWidget* mpWindowBackground = nullptr;
 
     QPointer<dlgMapper> mpMapper;
 
@@ -413,7 +434,11 @@ public:
     QWidget* mpButtonMainLayer = nullptr;
     int mBgImageMode = 0;
     QString mBgImagePath;
+    int mWindowBgImageMode = 0;
+    QString mWindowBgImagePath;
+    QPixmap mWindowBgSourcePixmap;
     bool mHScrollBarEnabled = false;
+    bool mScrollBarEnabled = true;
     ControlCharacterMode mControlCharacter = ControlCharacterMode::AsIs;
     QVideoWidget* mpVideoWidget = nullptr;
     QSplitter* commandSplitter = nullptr;
@@ -457,6 +482,7 @@ private:
     void initializeOSC8SelectionFeature();
     void initializeOSC8SpoilerFeature();
     void initializeOSC8DisabledFeature();
+    void initializeOSC8TitleFeature();
 
     // OSC 8 hyperlink managers
     std::unique_ptr<THyperlinkCompactManager> mpHyperlinkCompactManager;
@@ -477,6 +503,10 @@ private:
     // Whether to show (a 13 character by default) timestamp to the left of
     // each line of text:
     bool mShowTimeStamps = false;
+    // mpMainFrame's palette cannot hold this - it is rebuilt from scratch on every colour change
+    QColor mBorderColor = Qt::black;
+    // latches the 'cover' scale failure so a resize drag does not repeat the warning
+    bool mWindowBgCoverScaleFailed = false;
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(TConsole::ConsoleType)
@@ -486,17 +516,33 @@ inline QDebug& operator<<(QDebug& debug, const TConsole::ConsoleType& type)
 {
     QString text;
     const QDebugStateSaver saver(debug);
+    // clang-format off
     switch (type) {
-    case TConsole::UnknownType:           text = qsl("Unknown"); break;
-    case TConsole::CentralDebugConsole:   text = qsl("Central Debug Console"); break;
-    case TConsole::ErrorConsole:          text = qsl("Profile Error Console"); break;
-    case TConsole::MainConsole:           text = qsl("Profile Main Console"); break;
-    case TConsole::SubConsole:            text = qsl("Mini Console"); break;
-    case TConsole::UserWindow:            text = qsl("User Window"); break;
-    case TConsole::Buffer:                text = qsl("Buffer"); break;
+    case TConsole::UnknownType:
+        text = qsl("Unknown");
+        break;
+    case TConsole::CentralDebugConsole:
+        text = qsl("Central Debug Console");
+        break;
+    case TConsole::ErrorConsole:
+        text = qsl("Profile Error Console");
+        break;
+    case TConsole::MainConsole:
+        text = qsl("Profile Main Console");
+        break;
+    case TConsole::SubConsole:
+        text = qsl("Mini Console");
+        break;
+    case TConsole::UserWindow:
+        text = qsl("User Window");
+        break;
+    case TConsole::Buffer:
+        text = qsl("Buffer");
+        break;
     default:
         text = qsl("Non-coded Type");
     }
+    // clang-format on
     debug.nospace() << text;
     return debug;
 }

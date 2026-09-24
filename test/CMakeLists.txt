@@ -1,126 +1,253 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.25.1)
+cmake_minimum_required(VERSION 3.25.1)
 
-SET(CMAKE_AUTOMOC ON)
-SET(CMAKE_INCLUDE_CURRENT_DIR ON)
-SET(CMAKE_CXX_STANDARD 20)
-SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-
-PROJECT(mudlet-tests
-        LANGUAGES CXX)
-
-ENABLE_TESTING()
-
-find_package(Qt6 6.8.2 REQUIRED
-    COMPONENTS Core
-    Multimedia
-    MultimediaWidgets
-    Network
-    OpenGL
-    UiTools
-    Widgets
-    Concurrent
-    Test)
-
-link_libraries(
-    Qt6::Test
-    Qt6::Concurrent
-    Qt6::Core
-    Qt6::Network
-    Qt6::Multimedia
-    Qt6::MultimediaWidgets
-    Qt6::UiTools
-    Qt6::Widgets)
-
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake ${CMAKE_MODULE_PATH})
-
-# Include the same keychain configuration as main project
-include(IncludeOptionalModule)
-include_optional_module(ENVIRONMENT_VARIABLE WITH_OWN_QTKEYCHAIN
-                        OPTION_VARIABLE USE_OWN_QTKEYCHAIN
-                        READABLE_NAME "own QtKeychain library")
-
-if(NOT DEFINED USE_OWN_QTKEYCHAIN)
-    # Check the parent project's setting
-    get_directory_property(parent_USE_OWN_QTKEYCHAIN PARENT_DIRECTORY USE_OWN_QTKEYCHAIN)
-    if(DEFINED parent_USE_OWN_QTKEYCHAIN)
-        set(USE_OWN_QTKEYCHAIN ${parent_USE_OWN_QTKEYCHAIN})
-    endif()
+if(NOT WIN32)
+    include(${CMAKE_SOURCE_DIR}/src/cmake/EnableSanitizers.cmake)
 endif()
 
-# Configure QtKeychain linking
-if(USE_OWN_QTKEYCHAIN)
-    # Link to the already built qt6keychain target from parent
-    set(KEYCHAIN_LIBRARY qt6keychain)
-else()
-    find_package(Qt6Keychain REQUIRED)
-    set(KEYCHAIN_LIBRARY qt6keychain)
-endif()
+find_package(Qt6 6.8.2 REQUIRED COMPONENTS Test Network Widgets)
 
+# On Windows Qt diverts QTest's stdout to OutputDebugString unless it believes
+# stderr has a console attached, which an MSYS2 shell or a CI runner does not give
+# it, so a failing test reports an exit code and nothing else (#9747). Deferred so
+# that tests registered further down the file are covered too; TESTS does not
+# descend into subdirectories, hence the second call in functional_tests.
+function(restore_windows_test_output)
+    get_property(registeredTests DIRECTORY PROPERTY TESTS)
+    foreach(testName ${registeredTests})
+        set_property(TEST ${testName} APPEND PROPERTY ENVIRONMENT "QT_ASSUME_STDERR_HAS_CONSOLE=1")
+    endforeach()
+endfunction()
+cmake_language(DEFER CALL restore_windows_test_output)
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../src")
-
-add_executable(TEntityResolverTest TEntityResolverTest.cpp ../src/TEntityResolver.cpp)
-add_test(NAME TEntityResolverTest COMMAND TEntityResolverTest)
-
-add_executable(TEntityHandlerTest TEntityHandlerTest.cpp ../src/TEntityHandler.cpp ../src/TEntityResolver.cpp)
-add_test(NAME TEntityHandlerTest COMMAND TEntityHandlerTest)
-
-add_executable(TLinkStoreTest TLinkStoreTest.cpp ../src/TLinkStore.cpp ../src/TEntityResolver.cpp)
-add_test(NAME TLinkStoreTest COMMAND TLinkStoreTest)
-
-target_compile_definitions(TLinkStoreTest PRIVATE LinkStore_Test)
-
-file(GLOB MXP_SOURCE ../src/TMxp*.cpp ../src/MxpTag.cpp ../src/TEntityHandler.cpp ../src/TEntityResolver.cpp ../src/TStringUtils.cpp ../src/TEncodingHelper.cpp ../src/TTextCodec.cpp ../src/TEncodingTable.cpp)
-list(FILTER MXP_SOURCE EXCLUDE REGEX ".*/src/TMxpMudlet.cpp")
-list(FILTER MXP_SOURCE EXCLUDE REGEX ".*/src/TMxpFrameManager.cpp")
-
-add_executable(TMxpTagParserTest TMxpTagParserTest.cpp ../src/TMxpTagParser.cpp ../src/TMxpNodeBuilder.cpp ../src/MxpTag.cpp ../src/TStringUtils.cpp)
-add_test(NAME TMxpTagParserTest COMMAND TMxpTagParserTest)
-
-add_executable(TMxpSendTagHandlerTest TMxpSendTagHandlerTest.cpp ${MXP_SOURCE} ../src/TMxpSendTagHandler.cpp ../src/TMxpTagParser.cpp ../src/TMxpNodeBuilder.cpp)
-add_test(NAME TMxpSendTagHandlerTest COMMAND TMxpSendTagHandlerTest)
-
-add_executable(TMxpEntityTagHandlerTest TMxpEntityTagHandlerTest.cpp ${MXP_SOURCE} ../src/TMxpEntityTagHandler.cpp ../src/TMxpTagParser.cpp ../src/TMxpNodeBuilder.cpp)
-add_test(NAME TMxpEntityTagHandlerTest COMMAND TMxpEntityTagHandlerTest)
-
-add_executable(TMxpFrameDestTagHandlerTest TMxpFrameDestTagHandlerTest.cpp ${MXP_SOURCE} ../src/TMxpFrameTagHandler.cpp ../src/TMxpDestTagHandler.cpp ../src/TMxpTagParser.cpp ../src/TMxpNodeBuilder.cpp)
-add_test(NAME TMxpFrameDestTagHandlerTest COMMAND TMxpFrameDestTagHandlerTest)
-
-add_executable(TMxpVersionTagTest TMxpVersionTagTest.cpp ../src/TMxpVersionTagHandler.cpp ../src/TMxpTagParser.cpp ../src/TMxpNodeBuilder.cpp ../src/MxpTag.cpp ../src/TStringUtils.cpp ../src/TMxpTagHandler.cpp)
-add_test(NAME TMxpVersionTagTest COMMAND TMxpVersionTagTest)
-
-add_executable(TMxpFormattingTagsTest TMxpFormattingTagsTest.cpp ../src/TMxpFormattingTagsHandler.cpp ../src/TMxpTagParser.cpp ../src/TMxpNodeBuilder.cpp ../src/MxpTag.cpp ../src/TStringUtils.cpp ../src/TMxpTagHandler.cpp)
-add_test(NAME TMxpFormattingTagsTest COMMAND TMxpFormattingTagsTest)
-
-add_executable(TMxpCustomElementTagHandlerTest TMxpCustomElementTagHandlerTest.cpp ${MXP_SOURCE} ../src/TMxpSendTagHandler.cpp ../src/TMxpTagParser.cpp ../src/TMxpNodeBuilder.cpp )
-add_test(NAME TMxpCustomElementTagHandlerTest COMMAND TMxpCustomElementTagHandlerTest)
-
-add_executable(TMxpModeSecurityTest TMxpModeSecurityTest.cpp ${MXP_SOURCE} ../src/TMxpTagParser.cpp ../src/TMxpNodeBuilder.cpp)
-add_test(NAME TMxpModeSecurityTest COMMAND TMxpModeSecurityTest)
-add_executable(TMxpElementDefinitionHandlerTest TMxpElementDefinitionHandlerTest.cpp ${MXP_SOURCE})
-add_test(NAME TMxpElementDefinitionHandlerTest COMMAND TMxpElementDefinitionHandlerTest)
-
-add_executable(TLuaInterfaceTest TLuaInterfaceTest.cpp ../src/LuaInterface.cpp ../src/TVar.cpp ../src/VarUnit.cpp)
-add_test(NAME TLuaInterfaceTest COMMAND TLuaInterfaceTest)
-
-find_package(Lua51 REQUIRED)
-target_link_libraries(
+set(UNIT_TESTS
+    TEntityResolverTest
+    TEntityHandlerTest
+    LuaLiteralTest
+    UntrustedTextTest
+    TLinkStoreTest
+    TMxpTagParserTest
+    TMxpSendTagHandlerTest
+    TMxpEntityTagHandlerTest
+    TMxpFrameDestTagHandlerTest
+    TMxpVersionTagTest
+    TMxpFormattingTagsTest
+    TMxpCustomElementTagHandlerTest
+    TMxpModeSecurityTest
+    TMxpEdgeCasesTest
+    TMxpElementDefinitionHandlerTest
     TLuaInterfaceTest
-    LUA51::LUA51)
+    EventLoopPumpTest
+    TVariableEditorTest
+    SecureStringUtilsTest
+    CredentialManagerTest
+    CredentialManagerKeychainTest
+    OAuthClientFlowTest
+    DiscordTest
+    TTextEditBlinkTest
+    TAreaSpanIndexTest
+    TAreaZLevelIndexTest
+    TAreaGridIndexTest
+    TKeySequenceEditTest
+    TEncodingHelperTest
+    PasswordMigrationTest
+    TMediaPathTraversalTest
+    ProfileNameValidationTest
+)
 
-add_executable(SecureStringUtilsTest SecureStringUtilsTest.cpp ../src/SecureStringUtils.cpp)
-target_link_libraries(SecureStringUtilsTest ${KEYCHAIN_LIBRARY})
-if(USE_OWN_QTKEYCHAIN)
-    target_compile_definitions(SecureStringUtilsTest PRIVATE INCLUDE_OWN_QT6_KEYCHAIN QTKEYCHAIN_NO_EXPORT)
+# The MCP server only lands in the Mudlet library when configured with USE_MCPSERVER, so
+# its test is gated the same way. Qt6::HttpServer reaches it through that library.
+if(USE_MCPSERVER)
+    list(APPEND UNIT_TESTS TMCPServerTest)
 endif()
-add_test(NAME SecureStringUtilsTest COMMAND SecureStringUtilsTest)
 
-add_executable(CredentialManagerTest CredentialManagerTest.cpp ../src/CredentialManager.cpp ../src/SecureStringUtils.cpp)
-target_link_libraries(CredentialManagerTest ${KEYCHAIN_LIBRARY})
-if(USE_OWN_QTKEYCHAIN)
-    target_compile_definitions(CredentialManagerTest PRIVATE INCLUDE_OWN_QT6_KEYCHAIN QTKEYCHAIN_NO_EXPORT)
+foreach(test_name ${UNIT_TESTS})
+    add_executable(${test_name} ${test_name}.cpp)
+    add_dependencies(${test_name} ${LIB_MUDLET_TARGET})
+    # mudlet_lsan_hooks has to be linked explicitly, see src/CMakeLists.txt
+    target_link_libraries(${test_name} PRIVATE Qt6::Test ${LIB_MUDLET_TARGET} mudlet_lsan_hooks)
+    add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)
+    set_tests_properties(${test_name} PROPERTIES
+        ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+    )
+endforeach()
+
+# A regression in what EventLoopPumpTest covers hangs rather than fails, so cap
+# it well under ctest's default 25 minutes.
+set_tests_properties(EventLoopPumpTest PROPERTIES TIMEOUT 60)
+
+# TKeySequenceEditTest's focus traversal cases need an active window, which an X
+# server with no window manager never gives them, so a plain `xvfb-run ctest`
+# reported two failures that meant nothing and cost the activation timeout twice
+# (#9575). The offscreen platform synthesises activation, and is already how the
+# Linux CI job runs the whole suite. Only on X11: macOS and Windows have a real
+# window manager, and running there natively is the only coverage of platform
+# focus traversal there is. APPEND so the sanitizer setting above survives.
+if(UNIX AND NOT APPLE)
+    set_property(TEST TKeySequenceEditTest APPEND PROPERTY ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
-add_test(NAME CredentialManagerTest COMMAND CredentialManagerTest)
+
+# Every ctest run has a display that can activate a window, one way or the other,
+# so a skipped traversal case there is a regression and not an environment. Only
+# somebody running the binary by hand on a bare X server is allowed the skip.
+set_property(TEST TKeySequenceEditTest APPEND PROPERTY ENVIRONMENT "MUDLET_REQUIRE_WINDOW_ACTIVATION=1")
+
+# Which releases' notes the update offer shows. Built from the updater sources
+# rather than linked against the Mudlet library, because the library only
+# contains them when configured with USE_UPDATER.
+add_executable(ReleaseChangelogSpanTest
+    ReleaseChangelogSpanTest.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/Feed.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/Release.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/SemVer.cpp
+)
+target_link_libraries(ReleaseChangelogSpanTest PRIVATE Qt6::Test Qt6::Network Qt6::Widgets)
+add_test(NAME ReleaseChangelogSpanTest COMMAND $<TARGET_FILE:ReleaseChangelogSpanTest>)
+set_tests_properties(ReleaseChangelogSpanTest PROPERTIES
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+)
+
+# DiscordTest checks the Lua API permission gating contract by scanning the source
+target_compile_definitions(DiscordTest PRIVATE MUDLET_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
+
+# Build-file consistency check. Independent of the Mudlet library: it only reads
+# src/CMakeLists.txt and the src/ directory, so it does not link LIB_MUDLET_TARGET.
+add_executable(CMakeListsConsistencyTest CMakeListsConsistencyTest.cpp)
+target_link_libraries(CMakeListsConsistencyTest PRIVATE Qt6::Test)
+target_compile_definitions(CMakeListsConsistencyTest PRIVATE MUDLET_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
+add_test(NAME CMakeListsConsistencyTest COMMAND $<TARGET_FILE:CMakeListsConsistencyTest>)
+set_tests_properties(CMakeListsConsistencyTest PROPERTIES
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+)
+
+# Pairing of a release's assets with its SHA256SUMS.txt. Built from the updater
+# sources rather than linked against the Mudlet library, because the library only
+# contains them when configured with USE_UPDATER.
+add_executable(ReleaseChecksumPairingTest
+    ReleaseChecksumPairingTest.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/Feed.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/Release.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/SemVer.cpp
+)
+target_link_libraries(ReleaseChecksumPairingTest PRIVATE Qt6::Test Qt6::Network Qt6::Widgets)
+add_test(NAME ReleaseChecksumPairingTest COMMAND $<TARGET_FILE:ReleaseChecksumPairingTest>)
+set_tests_properties(ReleaseChecksumPairingTest PROPERTIES
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+)
+
+# Which releases the updater offers as an update. Built from the updater sources
+# rather than linked against the Mudlet library, because the library only
+# contains them when configured with USE_UPDATER.
+add_executable(ReleasePlatformAssetTest
+    ReleasePlatformAssetTest.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/Feed.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/Release.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/SemVer.cpp
+)
+target_link_libraries(ReleasePlatformAssetTest PRIVATE Qt6::Test Qt6::Network Qt6::Widgets)
+add_test(NAME ReleasePlatformAssetTest COMMAND $<TARGET_FILE:ReleasePlatformAssetTest>)
+set_tests_properties(ReleasePlatformAssetTest PROPERTIES
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+)
+
+# The $XDG_CONFIG_HOME opt-in recipe the tests isolate themselves with. Reads the
+# test sources at runtime, so like CMakeListsConsistencyTest it links nothing.
+add_executable(XdgRecipeConsistencyTest XdgRecipeConsistencyTest.cpp)
+target_link_libraries(XdgRecipeConsistencyTest PRIVATE Qt6::Test)
+target_compile_definitions(XdgRecipeConsistencyTest PRIVATE MUDLET_TEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME XdgRecipeConsistencyTest COMMAND $<TARGET_FILE:XdgRecipeConsistencyTest>)
+set_tests_properties(XdgRecipeConsistencyTest PROPERTIES
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0"
+)
+
+# Checks the release-publishing scripts that keep SHA256SUMS.txt covering every
+# release binary - a binary without an entry is one the updater refuses to install
+if(NOT WIN32)
+    add_test(NAME ReleaseChecksumsTest
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/ci/release-checksums-test.sh
+    )
+endif()
+
+# The updater reads its version from the release tag, so a tag like "Mudlet-5.0"
+# stops every existing user being offered the release, silently
+if(NOT WIN32)
+    add_test(NAME ReleaseTagVersionTest
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/ci/release-tag-version-test.sh
+    )
+endif()
+
+# Checks the milestone lookup that add-milestone runs - the one that matched a
+# title that no longer existed and assigned nothing for months, without ever
+# failing. gh is stubbed, so there is no network and no token
+if(NOT WIN32)
+    add_test(NAME MilestoneResolutionTest
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/ci/milestone-resolution-test.sh
+    )
+endif()
 
 add_subdirectory(functional_tests)
+
+# CI runners are elevated, so nothing there catches a test executable Windows
+# refuses to launch for looking like an installer (#9748) - hence this gate,
+# whose message spells the heuristic out.
+function(mudlet_reject_uac_installer_name name)
+    string(TOLOWER "${name}" lowercaseName)
+    if(lowercaseName MATCHES "install|setup|update|patch")
+        message(FATAL_ERROR
+            "'${name}' cannot be used as a test name: Windows takes an unsigned executable whose name "
+            "contains '${CMAKE_MATCH_0}' for an installer and refuses to launch it without elevation "
+            "(#9748), so ctest reports BAD_COMMAND for it in an ordinary developer shell. Rename the "
+            "source file and its target to describe what the test asserts, watching for install, setup, "
+            "update and patch as substrings - Dispatch carries one.")
+    endif()
+endfunction()
+
+function(mudlet_reject_uac_installer_target_names directory)
+    get_property(targets DIRECTORY "${directory}" PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(target ${targets})
+        get_target_property(targetType ${target} TYPE)
+        if(NOT targetType STREQUAL "EXECUTABLE")
+            continue()
+        endif()
+        set_property(GLOBAL APPEND PROPERTY mudletUacCheckedExecutables "${target}")
+        get_target_property(executableName ${target} OUTPUT_NAME)
+        if(NOT executableName)
+            set(executableName ${target})
+        endif()
+        mudlet_reject_uac_installer_name("${executableName}")
+    endforeach()
+
+    get_property(subdirectories DIRECTORY "${directory}" PROPERTY SUBDIRECTORIES)
+    foreach(subdirectory ${subdirectories})
+        mudlet_reject_uac_installer_target_names("${subdirectory}")
+    endforeach()
+endfunction()
+
+# Both passes are needed. Targets carry the name that actually reaches disk,
+# OUTPUT_NAME included, but only for the tests this configuration builds:
+# NewReleaseDialogTeardownTest, for one, is registered only under USE_UPDATER.
+# Source names are what the registration loops derive executable names from,
+# and are present whatever the configuration.
+function(mudlet_check_test_executable_names directory)
+    mudlet_reject_uac_installer_target_names("${directory}")
+
+    get_property(checkedExecutables GLOBAL PROPERTY mudletUacCheckedExecutables)
+    if(NOT checkedExecutables)
+        message(FATAL_ERROR "The test executable name check found no executables under ${directory}, so it is checking nothing.")
+    endif()
+
+    file(GLOB_RECURSE testSources "${directory}/*.cpp")
+    if(NOT testSources)
+        message(FATAL_ERROR "The test executable name check found no sources under ${directory}, so it is checking nothing.")
+    endif()
+    foreach(testSource ${testSources})
+        get_filename_component(sourceName "${testSource}" NAME_WE)
+        mudlet_reject_uac_installer_name("${sourceName}")
+    endforeach()
+endfunction()
+
+# Deferred rather than called outright, so that targets registered below this
+# line, and in subdirectories added below it, are checked as well
+cmake_language(DEFER CALL mudlet_check_test_executable_names "${CMAKE_CURRENT_SOURCE_DIR}")

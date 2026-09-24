@@ -22,9 +22,15 @@
 #include "MxpTag.h"
 #include "TStringUtils.h"
 
+#include <QByteArray>
+
 class TMxpNodeBuilder
 {
     bool mOptionIgnoreText;
+
+    // Session encoding used to decode attribute bytes; defaults to UTF-8 for
+    // callers (e.g. re-parsing already-decoded definitions) that don't set it.
+    QByteArray mEncoding{QByteArrayLiteral("UTF-8")};
 
     // current tag attrs
     std::string mCurrentTagName;
@@ -83,6 +89,8 @@ public:
     void reset();
     void resetForNewTag();
 
+    void setEncoding(const QByteArray& encoding) { mEncoding = encoding; }
+
     inline bool hasTag() const { return isTag() && hasNode(); }
 
     inline bool hasNode() const { return mHasNode; }
@@ -96,6 +104,16 @@ public:
     inline bool isTag() const { return !mIsText; }
 
     inline bool isText() const { return mIsText; }
+
+    inline bool isEndTag() const { return mIsEndTag; }
+
+    // Returns the finalized tag name if boundary has been reached,
+    // or the partially accumulated name characters if still building
+    const std::string& getPartialTagName() const;
+
+    // Returns true when the tag name has been finalized (boundary character
+    // like space or > was reached after the name)
+    bool isTagNameComplete() const { return !mCurrentTagName.empty(); }
 
     const std::string& getRawTagContent() const { return mRawTagContent; }
     void setRawTagContent(const std::string& content) { mRawTagContent = content; }
