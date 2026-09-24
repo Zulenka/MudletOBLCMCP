@@ -94,7 +94,10 @@ hud::SectionState openSection(lua_State* L, const int payload, const char* key)
 
 // One entry of an afflictions or defences array. An entry with no name is dropped:
 // an unnamed chip is worse than no chip.
-bool readAffliction(lua_State* L, const int entry, hud::Affliction& affliction)
+// markInference is set for the target's list: those entries are guesses because of
+// where they come from, so they must render as guesses even when the adapter left
+// the confidence out.
+bool readAffliction(lua_State* L, const int entry, hud::Affliction& affliction, const bool markInference)
 {
     affliction.name = stringField(L, entry, "name");
     if (affliction.name.isEmpty()) {
@@ -105,10 +108,11 @@ bool readAffliction(lua_State* L, const int entry, hud::Affliction& affliction)
     if (affliction.confidence > 100) {
         affliction.confidence = 100;
     }
+    affliction.inference = markInference;
     return true;
 }
 
-void readAfflictionArray(lua_State* L, const int array, QVector<hud::Affliction>& into)
+void readAfflictionArray(lua_State* L, const int array, QVector<hud::Affliction>& into, const bool markInference = false)
 {
     const int count = static_cast<int>(lua_objlen(L, array));
     into.reserve(count);
@@ -116,7 +120,7 @@ void readAfflictionArray(lua_State* L, const int array, QVector<hud::Affliction>
         lua_rawgeti(L, array, i);
         if (lua_istable(L, -1)) {
             hud::Affliction affliction;
-            if (readAffliction(L, lua_gettop(L), affliction)) {
+            if (readAffliction(L, lua_gettop(L), affliction, markInference)) {
                 into.append(affliction);
             }
         }
@@ -201,7 +205,8 @@ void readTarget(lua_State* L, const int section, hud::Target& target)
 
     lua_getfield(L, section, "afflictions");
     if (lua_istable(L, -1)) {
-        readAfflictionArray(L, lua_gettop(L), target.afflictions);
+        // true: the target's afflictions are inferences by definition.
+        readAfflictionArray(L, lua_gettop(L), target.afflictions, true);
     }
     lua_pop(L, 1);
 

@@ -81,10 +81,15 @@ struct Affliction
     QString name;
     // Epoch seconds when it was first believed; 0 if the adapter did not say.
     double since = 0.0;
-    // -1 = a fact from the game. 0-100 = an inference, at that confidence.
+    // -1 = confidence not stated. 0-100 = an inference, at that confidence.
     int confidence = -1;
+    // Set for entries that are guesses by virtue of WHERE they came from, whatever
+    // confidence was supplied. Everything in the target section is an inference -
+    // the game never reports enemy afflictions - so an adapter that omits the
+    // confidence must not thereby promote a guess into a fact-styled chip.
+    bool inference = false;
 
-    bool inferred() const { return confidence >= 0; }
+    bool inferred() const { return inference || confidence >= 0; }
 };
 
 // Per-limb damage on the target. Ltracker-style counters run 0-100 as a percentage

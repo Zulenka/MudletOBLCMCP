@@ -4722,6 +4722,17 @@ bool Host::setProfileStyleSheet(const QString& styleSheet)
     for (auto& dockWidget : mpConsole->mDockWidgetMap) {
         dockWidget->setStyleSheet(styleSheet);
     }
+#ifdef INCLUDE_ACHAEA_HUD
+    // The HUD keeps the stylesheet it was handed at creation, so a later theme
+    // change would leave it mismatched or unreadable unless it is updated here
+    // too. Its dock is not in mDockWidgetMap - that map holds only user windows.
+    if (mpAchaeaHud) {
+        mpAchaeaHud->setStyleSheet(styleSheet);
+    }
+    if (mpAchaeaHudDock) {
+        mpAchaeaHudDock->setStyleSheet(styleSheet);
+    }
+#endif
     if (this == mudlet::self()->mpCurrentActiveHost) {
         mudlet::self()->setGlobalStyleSheet(styleSheet);
     }

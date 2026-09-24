@@ -37,25 +37,32 @@
 #include <QToolTip>
 #include <QVBoxLayout>
 
-// How long a section's data stays believable, which is not the same question for
-// every section.
+// Whether a section decays on its own, measured in seconds of silence;
+// csmNeverStale means it does not.
 //
-// Own afflictions, defences and the room are FACTS pushed over GMCP. The game
-// sends a message when they change, so silence means "still true", not "no longer
-// known" - ageing them into grey would be the panel lying about its own evidence.
-// They carry csmNeverStale and only ever show their age.
+// Every section is currently csmNeverStale, and that is a deliberate conclusion
+// rather than a default. All of this data is pushed over GMCP: the game sends a
+// message when something changes, so silence means "unchanged", not "no longer
+// known". Vitals were the last holdout on the theory that they arrive with every
+// prompt - but Achaea stops resending them when nothing is happening, so a
+// character standing still had its correct, current health condemned as stale
+// after a minute. Ageing a fact out of a push feed is the panel misrepresenting
+// its own evidence.
 //
-// The target's afflictions and limb counts are INFERENCES from the user's own
-// attacks. Nothing confirms them and nothing retracts them, so they really do decay
-// with time, and saying so is the entire point of the distinction.
+// The inference-versus-fact distinction the panel exists to draw has NOT been
+// lost with it. It lives per entry, where the evidence actually differs: an
+// inferred affliction still renders with a dashed border, a confidence-scaled
+// alpha, its confidence percentage and its own age (see ChipFlow). A section
+// heading was always the wrong place for it, because a target section mixes
+// GMCP facts (name, class, health) with inferences (afflictions, limbs) and a
+// single verdict on the whole box cannot be right about both.
 //
-// Vitals sit in between: they arrive with every prompt, so a long silence does mean
-// the game stopped talking - but a character standing still legitimately produces no
-// prompts, so the threshold is generous rather than twitchy.
+// These stay named per section so any one of them can decay again without
+// touching the logic.
 static constexpr int csmNeverStale = 0;
-static constexpr int csmVitalsStaleSeconds = 60;
+static constexpr int csmVitalsStaleSeconds = csmNeverStale;
 static constexpr int csmListStaleSeconds = csmNeverStale;
-static constexpr int csmTargetStaleSeconds = 30;
+static constexpr int csmTargetStaleSeconds = csmNeverStale;
 static constexpr int csmRoomStaleSeconds = csmNeverStale;
 
 // Repaints are capped at this interval; the age labels tick at the slower one.
@@ -992,12 +999,17 @@ bool THudPanel::refreshHeading(SectionBox& box, const hud::Section& section, int
     // than admitting that: it reports the age as unknown and is never marked stale.
     const double age = section.updated > 0.0 ? now - section.updated : -1.0;
     // csmNeverStale marks a section whose data does not decay just because nothing
-    // has happened to it. Its age is still shown; it is simply never condemned.
+    // has happened to it, so it is neither aged on screen nor ever condemned.
     const bool ages = staleAfterSeconds > csmNeverStale;
     const bool stale = present && ages && age >= static_cast<double>(staleAfterSeconds);
 
     QString text;
     if (!present) {
+        text.clear();
+    } else if (!ages) {
+        // A section that never goes stale has no decision-relevant age - a
+        // counter climbing past ten minutes on a defence that is still up is
+        // noise. Whether the adapter is alive at all is the footer's job.
         text.clear();
     } else if (age < 0.0) {
         //: Shown where a HUD section's age would be when the adapter sent no
@@ -1171,21 +1183,14 @@ void THudPanel::refresh()
     refreshFooter(now);
 }
 
-// Once a second, and touching only the age labels - unless a section has just crossed
-// its staleness threshold, which changes how that section's contents have to be drawn
-// and so needs a real repaint.
+// Once a second. Ages are printed inside the chips themselves - an own affliction
+// carries "12s", an inferred one "asthma 80% 12s" - so they only advance if the
+// chips are rebuilt, which a heading-only pass does not do. This used to escalate
+// to a full refresh solely when a section crossed its staleness threshold; now
+// that no section decays, that escalation can never fire, and the ages would
+// freeze for as long as the game stayed quiet. Redrawing the whole panel once a
+// second is cheap and is the only way the printed ages stay true.
 void THudPanel::tick()
 {
-    const double now = epochNow();
-    bool stalenessChanged = false;
-    stalenessChanged |= refreshHeading(mVitalsBox, mSnapshot.vitals, csmVitalsStaleSeconds, now);
-    stalenessChanged |= refreshHeading(mAfflictionsBox, mSnapshot.afflictions, csmListStaleSeconds, now);
-    stalenessChanged |= refreshHeading(mDefencesBox, mSnapshot.defences, csmListStaleSeconds, now);
-    stalenessChanged |= refreshHeading(mTargetBox, mSnapshot.target, csmTargetStaleSeconds, now);
-    stalenessChanged |= refreshHeading(mRoomBox, mSnapshot.room, csmRoomStaleSeconds, now);
-    refreshFooter(now);
-
-    if (stalenessChanged) {
-        scheduleRefresh();
-    }
+    refresh();
 }
